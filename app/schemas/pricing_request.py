@@ -48,6 +48,7 @@ class PricingRequestResponse(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
+    final_approved_price: Optional[float] = None
     
     class Config:
         from_attributes = True

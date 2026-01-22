@@ -84,6 +84,7 @@ def pl_decide(
 
         elif action == PLActionEnum.REJECT:
             request.status = RequestStatus.REJECTED_BY_PL.value
+            request.final_approved_price = None  # Clear any previous approved price
 
         elif action == PLActionEnum.ESCALATE:
             if not request.vp_email:

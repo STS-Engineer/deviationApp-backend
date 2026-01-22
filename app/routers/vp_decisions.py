@@ -83,6 +83,7 @@ def vp_decide(
 
         elif action == VPActionEnum.REJECT:
             request.status = RequestStatus.REJECTED_BY_VP.value
+            request.final_approved_price = None  # Clear any previous approved price
 
         request.vp_suggested_price = decision.suggested_price
         request.vp_comments = decision.comments

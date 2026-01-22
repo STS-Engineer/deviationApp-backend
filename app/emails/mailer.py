@@ -198,12 +198,14 @@ def send_pl_decision_to_commercial(
     
     decision_icon = {
         "APPROVED_BY_PL": "✅",
+        "REJECTED_BY_PL": "❌",
         "BACK_TO_COMMERCIAL": "⚠️",
         "ESCALATED_TO_VP": "🔺",
     }.get(decision, "📋")
     
     decision_color = {
         "APPROVED_BY_PL": "#198754",
+        "REJECTED_BY_PL": "#dc3545",
         "BACK_TO_COMMERCIAL": "#ffc107",
         "ESCALATED_TO_VP": "#0d6efd",
     }.get(decision, "#666")
@@ -441,11 +443,15 @@ def send_vp_decision_to_commercial(
     """Send VP final decision to commercial"""
     
     decision_icon = {
+        "APPROVED_BY_VP": "✅",
+        "REJECTED_BY_VP": "❌",
         "CLOSED": "✅",
         "BACK_TO_COMMERCIAL": "⚠️",
     }.get(decision, "📋")
     
     decision_color = {
+        "APPROVED_BY_VP": "#198754",
+        "REJECTED_BY_VP": "#dc3545",
         "CLOSED": "#198754",
         "BACK_TO_COMMERCIAL": "#ffc107",
     }.get(decision, "#666")
