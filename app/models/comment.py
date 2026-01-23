@@ -1,7 +1,7 @@
 """
 Comment/Notes model for discussion threads on pricing requests
 """
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean
 from sqlalchemy.sql import func
 from app.core.database import Base
 
@@ -17,6 +17,8 @@ class Comment(Base):
     author_role = Column(String(50), nullable=False)  # COMMERCIAL, PL, VP
     
     content = Column(Text, nullable=False)
+    
+    is_archived = Column(Boolean, default=False, nullable=False, index=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at = Column(

@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.database import engine, Base
 from app.models.pricing_request import PricingRequest
 from app.models.comment import Comment
-from app.routers import pricing_request, pl_decisions, vp_decisions, auth, dropdowns, comments
+from app.models.notification import Notification
+from app.routers import pricing_request, pl_decisions, vp_decisions, auth, dropdowns, comments, notifications
 from app.utils.scheduler import start_scheduler, stop_scheduler
 
 app = FastAPI(title="Avocarbon Deviation Pricing API")
@@ -45,3 +46,5 @@ app.include_router(auth.router)
 app.include_router(dropdowns.router)
 
 app.include_router(comments.router)
+
+app.include_router(notifications.router)

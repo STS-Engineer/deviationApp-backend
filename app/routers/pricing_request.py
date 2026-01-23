@@ -215,3 +215,80 @@ async def upload_attachment(file: UploadFile = File(...)):
         "saved_path": file_path,
         "size": file_size
     }
+
+@router.get("/pl/archived")
+def get_pl_archived_requests(
+    pl_email: str = Query(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Get archived requests for a PL responsible (approved or rejected by PL)
+    """
+    requests = db.query(PricingRequest).filter(
+        PricingRequest.product_line_responsible_email == pl_email,
+        PricingRequest.status.in_([
+            RequestStatus.APPROVED_BY_PL.value,
+            RequestStatus.REJECTED_BY_PL.value,
+            RequestStatus.APPROVED_BY_VP.value,
+            RequestStatus.REJECTED_BY_VP.value,
+        ])
+    ).order_by(PricingRequest.pl_decision_date.desc()).all()
+    
+    return [
+        {
+            "id": r.id,
+            "costing_number": r.costing_number,
+            "project_name": r.project_name,
+            "customer": r.customer,
+            "product_line": r.product_line,
+            "plant": r.plant,
+            "yearly_sales": float(r.yearly_sales),
+            "initial_price": float(r.initial_price),
+            "target_price": float(r.target_price),
+            "pl_suggested_price": float(r.pl_suggested_price) if r.pl_suggested_price else None,
+            "vp_suggested_price": float(r.vp_suggested_price) if r.vp_suggested_price else None,
+            "final_approved_price": float(r.final_approved_price) if r.final_approved_price else None,
+            "status": r.status,
+            "created_at": r.created_at,
+            "pl_decision_date": r.pl_decision_date,
+            "vp_decision_date": r.vp_decision_date,
+        }
+        for r in requests
+    ]
+
+
+@router.get("/vp/archived")
+def get_vp_archived_requests(
+    vp_email: str = Query(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Get archived requests for a VP (approved or rejected by VP)
+    """
+    requests = db.query(PricingRequest).filter(
+        PricingRequest.vp_email == vp_email,
+        PricingRequest.status.in_([
+            RequestStatus.APPROVED_BY_VP.value,
+            RequestStatus.REJECTED_BY_VP.value,
+        ])
+    ).order_by(PricingRequest.vp_decision_date.desc()).all()
+    
+    return [
+        {
+            "id": r.id,
+            "costing_number": r.costing_number,
+            "project_name": r.project_name,
+            "customer": r.customer,
+            "product_line": r.product_line,
+            "plant": r.plant,
+            "yearly_sales": float(r.yearly_sales),
+            "initial_price": float(r.initial_price),
+            "target_price": float(r.target_price),
+            "vp_suggested_price": float(r.vp_suggested_price) if r.vp_suggested_price else None,
+            "final_approved_price": float(r.final_approved_price) if r.final_approved_price else None,
+            "status": r.status,
+            "created_at": r.created_at,
+            "vp_decision_date": r.vp_decision_date,
+        }
+        for r in requests
+    ]

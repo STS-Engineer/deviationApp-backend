@@ -1,11 +1,13 @@
 import random
 import string
+import logging
 from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr
 from app.emails.mailer import send_verification_email
 from app.utils.users import get_users_by_role
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 # In-memory storage for verification codes (email -> {code, role, expires_at})
@@ -66,13 +68,15 @@ async def send_verification_code(request: SendVerificationRequest):
         "role": role,
         "expires_at": expires_at
     }
+    
+    logger.info(f"Verification code generated for {email} (role: {role})")
 
     # Send email with verification code
     try:
         await send_verification_email(email, code)
     except Exception as e:
         # If email fails, still return success but log the error
-        print(f"Failed to send verification email to {email}: {e}")
+        logger.error(f"Failed to send verification email to {email}: {e}")
         # For testing, you could comment this to allow proceeding without email
 
     return {
@@ -90,9 +94,12 @@ def verify_code(request: VerifyCodeRequest) -> UserInfo:
     email = request.email.lower()
     code = request.code.strip()
     role = request.role.upper()
+    
+    logger.info(f"Attempting to verify code for {email} (role: {role})")
 
     # Check if verification code exists
     if email not in verification_codes:
+        logger.warning(f"No verification code found for {email}")
         raise HTTPException(status_code=400, detail="No verification code sent to this email")
 
     stored_data = verification_codes[email]
@@ -100,21 +107,30 @@ def verify_code(request: VerifyCodeRequest) -> UserInfo:
     # Check if code has expired
     if datetime.utcnow() > stored_data["expires_at"]:
         del verification_codes[email]
+        logger.warning(f"Verification code expired for {email}")
         raise HTTPException(status_code=400, detail="Verification code has expired. Please request a new one.")
 
     # Check if code matches
     if code != stored_data["code"]:
+        logger.warning(f"Invalid code for {email}: got {code}, expected {stored_data['code']}")
         raise HTTPException(status_code=400, detail="Invalid verification code")
 
-    # Check if role matches
-    if role != stored_data["role"]:
-        raise HTTPException(status_code=400, detail="Role mismatch")
+    # Check if role matches (case-insensitive)
+    stored_role = stored_data["role"].upper()
+    if role.upper() != stored_role:
+        logger.warning(f"Role mismatch for {email}: got {role}, expected {stored_role}")
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Role mismatch: expected {stored_role}, got {role}"
+        )
 
     # Code is valid, create token (simple token: email:role:timestamp)
     token = f"{email}:{role}:{datetime.utcnow().isoformat()}"
 
     # Clean up used verification code
     del verification_codes[email]
+    
+    logger.info(f"Successfully verified {email} as {role}")
 
     return UserInfo(email=email, role=role, token=token)
 

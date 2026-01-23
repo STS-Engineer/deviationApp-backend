@@ -11,6 +11,7 @@ from app.emails.mailer import (
     send_pl_decision_to_commercial,
     send_escalation_to_vp,
 )
+from app.utils.notifications import create_pl_decision_notification
 import logging
 
 logger = logging.getLogger(__name__)
@@ -110,6 +111,17 @@ def pl_decide(
                 comments=request.pl_comments,
                 suggested_price=request.pl_suggested_price,
                 costing_number=request.costing_number,
+            )
+            # Create in-app notification
+            create_pl_decision_notification(
+                db=db,
+                recipient_email=request.requester_email,
+                recipient_role="COMMERCIAL",
+                request_id=request.id,
+                pl_name=request.product_line_responsible_name or request.product_line_responsible_email,
+                pl_email=request.product_line_responsible_email,
+                action=action.value,
+                suggested_price=request.pl_suggested_price,
             )
 
         elif action == PLActionEnum.ESCALATE:

@@ -8,6 +8,7 @@ from app.models.pricing_request import PricingRequest
 from app.models.enums import RequestStatus
 from app.schemas.vp_decision import VPDecision, VPActionEnum
 from app.emails.mailer import send_vp_decision_to_commercial
+from app.utils.notifications import create_vp_decision_notification
 import logging
 
 logger = logging.getLogger(__name__)
@@ -100,6 +101,18 @@ def vp_decide(
             comments=request.vp_comments,
             final_price=request.final_approved_price,
             costing_number=request.costing_number,
+        )
+
+        # Create in-app notification
+        create_vp_decision_notification(
+            db=db,
+            recipient_email=request.requester_email,
+            recipient_role="COMMERCIAL",
+            request_id=request.id,
+            vp_name=request.vp_name or request.vp_email,
+            vp_email=request.vp_email,
+            action=action.value,
+            final_price=request.final_approved_price,
         )
 
         return {
