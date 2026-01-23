@@ -9,7 +9,7 @@ python-dotenv==1.0.0
 python-multipart==0.0.6
 
 # For Excel support
-openpyxl==3.10.10
+openpyxl
 odfpy==1.4.1
 
 # CORS and security
