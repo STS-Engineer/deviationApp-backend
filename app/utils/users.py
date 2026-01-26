@@ -22,28 +22,27 @@ COMMERCIAL_USERS = [
     {"name": "Alice CHEN", "email": "alice.chen@avocarbon.com"},
     {"name": "Austin YUAN", "email": "austin.yuan@avocarbon.com"},
     {"name": "Felix WANG", "email": "felix.wang@avocarbon.com"},
+    {"name": "Rihem ARFAOUI", "email": "rihem.arfaoui@avocarbon.com"},
 ]
 
 PL_USERS = [
-    {"name": "Allan RIEGEL (Chokes, Assemblies)", "email": "allan.riegel@avocarbon.com"},
-    {"name": "Cedric BOUVIER (Brushes)", "email": "cedric.bouvier@avocarbon.com"},
+    {"name": "Cedric BOUVIER", "email": "cedric.bouvier@avocarbon.com"},
+    {"name": "Allan RIEGEL", "email": "allan.riegel@avocarbon.com"},
+    {"name": "Rihem ARFAOUI", "email": "rihem.arfaoui@avocarbon.com"},
 ]
 
 VP_USERS = [
-    {"name": "Olivier SPICKER (VP)", "email": "olivier.spicker@avocarbon.com"},
-    {"name": "Eric SUSZYLO (VP)", "email": "eric.suszylo@avocarbon.com"},
+    {"name": "Olivier SPICKER", "email": "olivier.spicker@avocarbon.com"},
+    {"name": "Rihem ARFAOUI", "email": "rihem.arfaoui@avocarbon.com"},
+    {"name": "Eric SUSZYLO", "email": "eric.suszylo@avocarbon.com"},
 ]
-
-# Test user - accessible for all roles
-TEST_USER = {"name": "Rihem ARFAOUI (Test)", "email": "rihem.arfaoui@avocarbon.com"}
-
 
 def get_users_by_role(role: str):
     """Get list of users for a specific role"""
     if role.upper() == "COMMERCIAL":
-        return COMMERCIAL_USERS + [TEST_USER]
+        return COMMERCIAL_USERS
     elif role.upper() == "PL":
-        return PL_USERS + [TEST_USER]
+        return PL_USERS
     elif role.upper() == "VP":
-        return VP_USERS + [TEST_USER]
+        return VP_USERS
     return []

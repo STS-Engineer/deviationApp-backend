@@ -1,6 +1,6 @@
 from fastapi import APIRouter
-from app.utils.constants import PRODUCT_LINES, PLANTS
-from app.utils.excel_loader import get_customers
+from app.utils.constants import PRODUCT_LINES, PLANTS, CUSTOMERS
+from app.utils.excel_loader import get_customers as get_customers_from_file
 
 router = APIRouter(prefix="/dropdowns", tags=["Dropdowns"])
 
@@ -19,12 +19,8 @@ def get_plants():
 
 @router.get("/customers")
 def get_customers_list():
-    """Get list of customers from Excel file or database"""
-    customers = get_customers()
+    """Get list of customers from Excel file, database, or fallback to constants"""
+    customers_from_file = get_customers_from_file()
     return {
-        "customers": customers if customers else [
-            "Customer A",
-            "Customer B",
-            "Customer C",
-        ]
+        "customers": customers_from_file if customers_from_file else CUSTOMERS
     }

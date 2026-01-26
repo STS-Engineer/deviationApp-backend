@@ -18,6 +18,41 @@ PLANTS = [
     "Chennai",
 ]
 
+CUSTOMERS = [
+    "AAM",
+    "Aisin",
+    "Bosch",
+    "BorgWarner",
+    "Continental",
+    "Denso",
+    "Delphi",
+    "Eaton",
+    "Federal-Mogul",
+    "Faurecia",
+    "GKN",
+    "Hitachi",
+    "Hyundai Mobis",
+    "Johnson Controls",
+    "Lear Corporation",
+    "Magna",
+    "Mahle",
+    "Marelli",
+    "Mitsuba",
+    "Mitsubishi Electric",
+    "NGK",
+    "NSK",
+    "NTN",
+    "Panasonic",
+    "Plastic Omnium",
+    "Renault",
+    "Robert Bosch",
+    "Schaeffler",
+    "Tenneco",
+    "Valeo",
+    "Vitesco Technologies",
+    "ZF Friedrichshafen",
+]
+
 # Status workflow
 REQUEST_STATUS_STAGES = {
     "DRAFT": 0,
