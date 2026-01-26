@@ -95,24 +95,28 @@ def verify_code(request: VerifyCodeRequest) -> UserInfo:
     code = request.code.strip()
     role = request.role.upper()
     
-    logger.info(f"Attempting to verify code for {email} (role: {role})")
+    logger.info(f"Attempting to verify code for {email} (role: {role}), code: {code}")
+    logger.debug(f"Current verification_codes keys: {list(verification_codes.keys())}")
 
     # Check if verification code exists
     if email not in verification_codes:
-        logger.warning(f"No verification code found for {email}")
+        logger.warning(f"No verification code found for {email}. Available emails: {list(verification_codes.keys())}")
         raise HTTPException(status_code=400, detail="No verification code sent to this email")
 
     stored_data = verification_codes[email]
+    logger.debug(f"Stored data for {email}: code={stored_data['code']}, role={stored_data['role']}, expires_at={stored_data['expires_at']}")
 
     # Check if code has expired
-    if datetime.utcnow() > stored_data["expires_at"]:
+    current_time = datetime.utcnow()
+    if current_time > stored_data["expires_at"]:
+        time_diff = (current_time - stored_data["expires_at"]).total_seconds()
         del verification_codes[email]
-        logger.warning(f"Verification code expired for {email}")
+        logger.warning(f"Verification code expired for {email} by {time_diff} seconds")
         raise HTTPException(status_code=400, detail="Verification code has expired. Please request a new one.")
 
     # Check if code matches
     if code != stored_data["code"]:
-        logger.warning(f"Invalid code for {email}: got {code}, expected {stored_data['code']}")
+        logger.warning(f"Invalid code for {email}: got '{code}' (len={len(code)}), expected '{stored_data['code']}' (len={len(stored_data['code'])})")
         raise HTTPException(status_code=400, detail="Invalid verification code")
 
     # Check if role matches (case-insensitive)
@@ -142,6 +146,26 @@ def get_users_for_role(role: str):
     """
     users = get_users_by_role(role)
     return users
+
+
+@router.get("/debug/codes")
+def debug_codes():
+    """
+    Debug endpoint to check verification codes (remove in production)
+    """
+    return {
+        "codes_count": len(verification_codes),
+        "emails": list(verification_codes.keys()),
+        "details": {
+            email: {
+                "code": data["code"],
+                "role": data["role"],
+                "expires_at": data["expires_at"].isoformat(),
+                "expired": datetime.utcnow() > data["expires_at"]
+            }
+            for email, data in verification_codes.items()
+        }
+    }
 
 
 @router.post("/login")
