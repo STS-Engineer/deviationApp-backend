@@ -17,3 +17,8 @@ class CommentResponse(BaseModel):
     author_role: str
     content: str
     is_archived: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
