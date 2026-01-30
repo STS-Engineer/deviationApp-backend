@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr
 from app.emails.mailer import send_verification_email
-from app.utils.users import get_users_by_role
+from app.utils.users import get_users_by_role as fetch_users_by_role
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -189,9 +189,8 @@ def login(user: UserLogin) -> UserInfo:
 
 
 @router.get("/users/{role}")
-def get_users_by_role(role: str):
+def get_users_list(role: str):
     """
     Get list of users for a specific role (PL or VP)
     """
-    users = get_users_by_role(role.upper())
-    return users
+    users = fetch_users_by_role(role.upper())
