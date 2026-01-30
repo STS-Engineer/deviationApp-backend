@@ -91,10 +91,10 @@ def create_comment(
             comment_preview=comment.content[:100],
         )
     
-    # Notify VP if not already VP and request is escalated
+    # Notify VP if commercial commented and request is escalated
     if role == "COMMERCIAL" and request.vp_email and request.vp_email != request.product_line_responsible_email:
         from app.models.enums import RequestStatus
-        if request.status in [RequestStatus.ESCALATED_TO_VP.value, RequestStatus.APPROVED_BY_VP.value]:
+        if request.status in [RequestStatus.ESCALATED_TO_VP.value, RequestStatus.APPROVED_BY_VP.value, RequestStatus.REJECTED_BY_VP.value]:
             create_comment_notification(
                 db=db,
                 recipient_email=request.vp_email,
@@ -111,6 +111,32 @@ def create_comment(
             db=db,
             recipient_email=request.requester_email,
             recipient_role="COMMERCIAL",
+            request_id=request_id,
+            commenter_name=author_name,
+            commenter_email=author_email,
+            comment_preview=comment.content[:100],
+        )
+    
+    # Notify VP if PL commented and request is escalated or approved
+    if role == "PL" and request.vp_email and request.vp_email != request.product_line_responsible_email:
+        from app.models.enums import RequestStatus
+        if request.status in [RequestStatus.ESCALATED_TO_VP.value, RequestStatus.APPROVED_BY_VP.value, RequestStatus.REJECTED_BY_VP.value]:
+            create_comment_notification(
+                db=db,
+                recipient_email=request.vp_email,
+                recipient_role="VP",
+                request_id=request_id,
+                commenter_name=author_name,
+                commenter_email=author_email,
+                comment_preview=comment.content[:100],
+            )
+    
+    # Notify PL if VP commented (so they can see the discussion)
+    if role == "VP" and request.product_line_responsible_email and request.product_line_responsible_email != request.vp_email:
+        create_comment_notification(
+            db=db,
+            recipient_email=request.product_line_responsible_email,
+            recipient_role="PL",
             request_id=request_id,
             commenter_name=author_name,
             commenter_email=author_email,
