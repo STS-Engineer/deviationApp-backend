@@ -22,15 +22,33 @@ router = APIRouter(prefix="/pl-decisions", tags=["PL Decisions"])
 @router.get("/inbox")
 def get_pl_inbox(
     pl_email: str = Query(...),
+    archived: bool = Query(False),
     db: Session = Depends(get_db)
 ):
     """
-    Get all pending pricing requests for a PL responsible
+    Get pricing requests for a PL responsible.
+    If archived=false: Get pending requests (UNDER_REVIEW_PL status)
+    If archived=true: Get completed requests (APPROVED_BY_PL or REJECTED_BY_PL status)
     """
-    requests = db.query(PricingRequest).filter(
-        PricingRequest.product_line_responsible_email == pl_email,
-        PricingRequest.status == RequestStatus.UNDER_REVIEW_PL.value
-    ).order_by(PricingRequest.created_at.desc()).all()
+    if not archived:
+        # Pending requests - only those under review by this PL
+        requests = db.query(PricingRequest).filter(
+            PricingRequest.product_line_responsible_email == pl_email,
+            PricingRequest.status == RequestStatus.UNDER_REVIEW_PL.value
+        ).order_by(PricingRequest.created_at.desc()).all()
+    else:
+        # Archived/completed requests - those this PL has already decided on
+        requests = db.query(PricingRequest).filter(
+            PricingRequest.product_line_responsible_email == pl_email,
+            PricingRequest.status.in_([
+                RequestStatus.APPROVED_BY_PL.value,
+                RequestStatus.REJECTED_BY_PL.value,
+                RequestStatus.ESCALATED_TO_VP.value,
+                RequestStatus.APPROVED_BY_VP.value,
+                RequestStatus.REJECTED_BY_VP.value,
+                RequestStatus.CLOSED.value
+            ])
+        ).order_by(PricingRequest.created_at.desc()).all()
     
     return [
         {
@@ -46,6 +64,7 @@ def get_pl_inbox(
             "problem_to_solve": r.problem_to_solve,
             "requester_email": r.requester_email,
             "requester_name": r.requester_name,
+            "pl_suggested_price": float(r.pl_suggested_price) if r.pl_suggested_price else None,
             "status": r.status,
             "created_at": r.created_at,
         }

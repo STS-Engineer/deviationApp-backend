@@ -19,15 +19,30 @@ router = APIRouter(prefix="/vp-decisions", tags=["VP Decisions"])
 @router.get("/inbox")
 def get_vp_inbox(
     vp_email: str = Query(...),
+    archived: bool = Query(False),
     db: Session = Depends(get_db)
 ):
     """
-    Get all escalated pricing requests for a VP
+    Get pricing requests for a VP.
+    If archived=false: Get escalated requests (ESCALATED_TO_VP status)
+    If archived=true: Get completed requests (APPROVED_BY_VP or REJECTED_BY_VP status)
     """
-    requests = db.query(PricingRequest).filter(
-        PricingRequest.vp_email == vp_email,
-        PricingRequest.status == RequestStatus.ESCALATED_TO_VP.value
-    ).order_by(PricingRequest.created_at.desc()).all()
+    if not archived:
+        # Escalated/pending requests - those awaiting VP decision
+        requests = db.query(PricingRequest).filter(
+            PricingRequest.vp_email == vp_email,
+            PricingRequest.status == RequestStatus.ESCALATED_TO_VP.value
+        ).order_by(PricingRequest.created_at.desc()).all()
+    else:
+        # Archived/completed requests - those VP has already decided on
+        requests = db.query(PricingRequest).filter(
+            PricingRequest.vp_email == vp_email,
+            PricingRequest.status.in_([
+                RequestStatus.APPROVED_BY_VP.value,
+                RequestStatus.REJECTED_BY_VP.value,
+                RequestStatus.CLOSED.value
+            ])
+        ).order_by(PricingRequest.created_at.desc()).all()
     
     return [
         {
