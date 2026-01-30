@@ -10,6 +10,9 @@ from app.models.comment import Comment
 from app.models.notification import Notification
 from app.routers import pricing_request, pl_decisions, vp_decisions, auth, dropdowns, comments, notifications
 from app.utils.scheduler import start_scheduler, stop_scheduler
+import logging
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Avocarbon Deviation Pricing API")
 
@@ -43,18 +46,63 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup():
-    Base.metadata.create_all(bind=engine)
-    start_scheduler()
+    try:
+        logger.info("Starting up application...")
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables created successfully")
+        start_scheduler()
+        logger.info("Scheduler started successfully")
+    except Exception as e:
+        logger.error(f"Startup error: {str(e)}", exc_info=True)
+        raise
 
 
 @app.on_event("shutdown")
 def shutdown():
-    stop_scheduler()
+    try:
+        logger.info("Shutting down application...")
+        stop_scheduler()
+        logger.info("Scheduler stopped successfully")
+    except Exception as e:
+        logger.error(f"Shutdown error: {str(e)}", exc_info=True)
 
 
 @app.get("/")
 def health():
-    return {"status": "API is running"}
+    """Health check endpoint"""
+    try:
+        logger.info("Health check requested")
+        return {
+            "status": "API is running",
+            "message": "Backend service is healthy and operational"
+        }
+    except Exception as e:
+        logger.error(f"Health check error: {str(e)}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+@app.get("/health")
+def health_detailed():
+    """Detailed health check endpoint"""
+    try:
+        # Test database connection
+        from sqlalchemy import text
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+        
+        db_status = "healthy"
+    except Exception as e:
+        logger.error(f"Database connection error: {str(e)}")
+        db_status = f"error: {str(e)}"
+    
+    return {
+        "status": "API is running",
+        "database": db_status,
+        "message": "Backend service is operational"
+    }
 
 
 app.include_router(pricing_request.router)
