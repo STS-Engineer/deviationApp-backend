@@ -104,36 +104,49 @@ def pl_decide(
 
         # Send appropriate email notifications
         if action in [PLActionEnum.APPROVE, PLActionEnum.REJECT]:
-            send_pl_decision_to_commercial(
-                to_email=request.requester_email,
-                project_name=request.project_name,
-                decision=request.status,
-                comments=request.pl_comments,
-                suggested_price=request.pl_suggested_price,
-                costing_number=request.costing_number,
-            )
+            try:
+                send_pl_decision_to_commercial(
+                    to_email=request.requester_email,
+                    project_name=request.project_name,
+                    decision=request.status,
+                    comments=request.pl_comments,
+                    suggested_price=request.pl_suggested_price,
+                    costing_number=request.costing_number,
+                )
+            except Exception as email_error:
+                logger.warning(f"Email notification failed (non-critical): {str(email_error)}")
+                # Continue even if email fails - decision is already saved
+            
             # Create in-app notification
-            create_pl_decision_notification(
-                db=db,
-                recipient_email=request.requester_email,
-                recipient_role="COMMERCIAL",
-                request_id=request.id,
-                pl_name=request.product_line_responsible_name or request.product_line_responsible_email,
-                pl_email=request.product_line_responsible_email,
-                action=action.value,
-                suggested_price=request.pl_suggested_price,
-            )
+            try:
+                create_pl_decision_notification(
+                    db=db,
+                    recipient_email=request.requester_email,
+                    recipient_role="COMMERCIAL",
+                    request_id=request.id,
+                    pl_name=request.product_line_responsible_name or request.product_line_responsible_email,
+                    pl_email=request.product_line_responsible_email,
+                    action=action.value,
+                    suggested_price=request.pl_suggested_price,
+                )
+            except Exception as notification_error:
+                logger.warning(f"In-app notification failed (non-critical): {str(notification_error)}")
+                # Continue even if notification fails
 
         elif action == PLActionEnum.ESCALATE:
-            send_escalation_to_vp(
-                to_email=request.vp_email,
-                project_name=request.project_name,
-                target_price=float(request.target_price),
-                comments=request.pl_comments,
-                initial_price=float(request.initial_price),
-                pl_name=request.product_line_responsible_name or request.product_line_responsible_email,
-                costing_number=request.costing_number,
-            )
+            try:
+                send_escalation_to_vp(
+                    to_email=request.vp_email,
+                    project_name=request.project_name,
+                    target_price=float(request.target_price),
+                    comments=request.pl_comments,
+                    initial_price=float(request.initial_price),
+                    pl_name=request.product_line_responsible_name or request.product_line_responsible_email,
+                    costing_number=request.costing_number,
+                )
+            except Exception as email_error:
+                logger.warning(f"Escalation email failed (non-critical): {str(email_error)}")
+                # Continue even if email fails - decision is already saved
 
         return {
             "message": f"Product Line decision processed: {action.value}",
@@ -142,8 +155,8 @@ def pl_decide(
         }
 
     except Exception as e:
-        logger.error(f"Error processing PL decision: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error processing decision")
+        logger.error(f"Error processing PL decision: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error processing decision: {str(e)}")
 
 
 @router.get("/{request_id}")

@@ -94,26 +94,34 @@ def vp_decide(
         db.refresh(request)
 
         # Send decision notification to commercial
-        send_vp_decision_to_commercial(
-            to_email=request.requester_email,
-            project_name=request.project_name,
-            decision=request.status,
-            comments=request.vp_comments,
-            final_price=request.final_approved_price,
-            costing_number=request.costing_number,
-        )
+        try:
+            send_vp_decision_to_commercial(
+                to_email=request.requester_email,
+                project_name=request.project_name,
+                decision=request.status,
+                comments=request.vp_comments,
+                final_price=request.final_approved_price,
+                costing_number=request.costing_number,
+            )
+        except Exception as email_error:
+            logger.warning(f"Email notification failed (non-critical): {str(email_error)}")
+            # Continue even if email fails - decision is already saved
 
         # Create in-app notification
-        create_vp_decision_notification(
-            db=db,
-            recipient_email=request.requester_email,
-            recipient_role="COMMERCIAL",
-            request_id=request.id,
-            vp_name=request.vp_name or request.vp_email,
-            vp_email=request.vp_email,
-            action=action.value,
-            final_price=request.final_approved_price,
-        )
+        try:
+            create_vp_decision_notification(
+                db=db,
+                recipient_email=request.requester_email,
+                recipient_role="COMMERCIAL",
+                request_id=request.id,
+                vp_name=request.vp_name or request.vp_email,
+                vp_email=request.vp_email,
+                action=action.value,
+                final_price=request.final_approved_price,
+            )
+        except Exception as notification_error:
+            logger.warning(f"In-app notification failed (non-critical): {str(notification_error)}")
+            # Continue even if notification fails
 
         return {
             "message": f"VP decision processed: {action.value}",
@@ -123,8 +131,8 @@ def vp_decide(
         }
 
     except Exception as e:
-        logger.error(f"Error processing VP decision: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error processing VP decision")
+        logger.error(f"Error processing VP decision: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error processing VP decision: {str(e)}")
 
 
 @router.get("/{request_id}")
