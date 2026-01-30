@@ -144,7 +144,7 @@ def get_users_for_role(role: str):
     """
     Get list of users for a specific role
     """
-    users = get_users_by_role(role)
+    users = fetch_users_by_role(role)
     return users
 
 
@@ -187,10 +187,3 @@ def login(user: UserLogin) -> UserInfo:
 
     return UserInfo(email=email, role=role, token=token)
 
-
-@router.get("/users/{role}")
-def get_users_list(role: str):
-    """
-    Get list of users for a specific role (PL or VP)
-    """
-    users = fetch_users_by_role(role.upper())
