@@ -187,3 +187,11 @@ def login(user: UserLogin) -> UserInfo:
 
     return UserInfo(email=email, role=role, token=token)
 
+
+@router.get("/users/{role}")
+def get_users_by_role(role: str):
+    """
+    Get list of users for a specific role (PL or VP)
+    """
+    users = get_users_by_role(role.upper())
+    return users
