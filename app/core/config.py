@@ -20,7 +20,7 @@ class Settings:
     SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
     SMTP_FROM = os.getenv("SMTP_FROM")
 
-    FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
-    BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL", "http://127.0.0.1:5002")
+    FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://deviation-price.azurewebsites.net")
+    BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL", "https://deviation-back.azurewebsites.net")
 
 settings = Settings()
