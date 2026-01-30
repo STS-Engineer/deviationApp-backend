@@ -34,23 +34,13 @@ class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
 # Add HTTPS redirect middleware first
 app.add_middleware(HTTPSRedirectMiddleware)
 
-# Add CORS middleware with explicit origins
-cors_origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://deviation-price.azurewebsites.net",
-    "*"  # Allow all origins as fallback
-]
-
+# Add CORS middleware - allow all origins for now
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origins=["*"],  # Allow all origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    allow_origin_regex=".*",  # Allow regex for any origin
 )
 
 
