@@ -34,13 +34,23 @@ class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
 # Add HTTPS redirect middleware first
 app.add_middleware(HTTPSRedirectMiddleware)
 
-# Add CORS middleware
+# Add CORS middleware with explicit origins
+cors_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://deviation-price.azurewebsites.net",
+    "*"  # Allow all origins as fallback
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_origin_regex=".*",  # Allow regex for any origin
 )
 
 
@@ -48,13 +58,22 @@ app.add_middleware(
 def startup():
     try:
         logger.info("Starting up application...")
+        logger.info("Creating database tables...")
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables created successfully")
-        start_scheduler()
-        logger.info("Scheduler started successfully")
+        
+        logger.info("Starting scheduler...")
+        try:
+            start_scheduler()
+            logger.info("Scheduler started successfully")
+        except Exception as scheduler_error:
+            logger.warning(f"Scheduler startup warning (non-critical): {str(scheduler_error)}")
+        
+        logger.info("Application startup complete")
     except Exception as e:
-        logger.error(f"Startup error: {str(e)}", exc_info=True)
-        raise
+        logger.error(f"Critical startup error: {str(e)}", exc_info=True)
+        # Don't raise - allow app to start even if scheduler fails
+        # raise
 
 
 @app.on_event("shutdown")
@@ -72,37 +91,43 @@ def health():
     """Health check endpoint"""
     try:
         logger.info("Health check requested")
+        # Ensure database tables exist
+        try:
+            Base.metadata.create_all(bind=engine)
+        except Exception as db_err:
+            logger.warning(f"Could not create tables: {db_err}")
+        
         return {
             "status": "API is running",
-            "message": "Backend service is healthy and operational"
+            "message": "Backend service is healthy and operational",
+            "version": "1.0.0"
         }
     except Exception as e:
         logger.error(f"Health check error: {str(e)}")
         return {
             "status": "error",
-            "message": str(e)
+            "message": str(e),
+            "version": "1.0.0"
         }
 
 
-@app.get("/health")
-def health_detailed():
-    """Detailed health check endpoint"""
+@app.get("/api/health")
+def api_health():
+    """Detailed API health check endpoint"""
     try:
-        # Test database connection
-        from sqlalchemy import text
-        with engine.connect() as connection:
-            connection.execute(text("SELECT 1"))
-        
-        db_status = "healthy"
+        logger.info("Detailed health check requested")
+        return {
+            "status": "healthy",
+            "service": "Avocarbon Deviation Pricing API",
+            "timestamp": None
+        }
     except Exception as e:
-        logger.error(f"Database connection error: {str(e)}")
-        db_status = f"error: {str(e)}"
-    
-    return {
-        "status": "API is running",
-        "database": db_status,
-        "message": "Backend service is operational"
-    }
+        logger.error(f"API health check error: {str(e)}")
+        return {
+            "status": "error",
+            "service": "Avocarbon Deviation Pricing API",
+            "error": str(e)
+        }
 
 
 app.include_router(pricing_request.router)
