@@ -3,6 +3,7 @@ import string
 import logging
 from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr
 from app.emails.mailer import send_verification_email
 from app.utils.users import get_users_by_role as fetch_users_by_role
@@ -12,6 +13,9 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 
 # In-memory storage for verification codes (email -> {code, role, expires_at})
 verification_codes = {}
+
+# Cache for user lists by role (role -> list of users)
+_users_cache = {}
 
 
 class SendVerificationRequest(BaseModel):
@@ -144,8 +148,22 @@ def get_users_for_role(role: str):
     """
     Get list of users for a specific role
     """
-    users = fetch_users_by_role(role)
-    return users
+    role_upper = role.upper()
+    
+    # Check in-memory cache first
+    if role_upper not in _users_cache:
+        _users_cache[role_upper] = fetch_users_by_role(role_upper)
+    
+    users = _users_cache[role_upper]
+    
+    # Add cache headers to improve performance on repeated requests
+    return JSONResponse(
+        content=[{"name": u["name"], "email": u["email"]} for u in users],
+        headers={
+            "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
+            "ETag": f'"{role_upper}"'
+        }
+    )
 
 
 @router.get("/debug/codes")
