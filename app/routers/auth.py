@@ -1,12 +1,15 @@
 import random
 import string
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr
+from typing import Optional
+from jose import jwt, JWTError
 from app.emails.mailer import send_verification_email
 from app.utils.users import get_users_by_role as fetch_users_by_role
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -27,6 +30,7 @@ class VerifyCodeRequest(BaseModel):
     email: EmailStr
     code: str
     role: str
+    verification_token: Optional[str] = None
 
 
 class UserInfo(BaseModel):
@@ -49,6 +53,16 @@ def generate_verification_code():
     """Generate a 6-digit verification code"""
     return ''.join(random.choices(string.digits, k=6))
 
+
+def create_verification_token(email: str, role: str, code: str, expires_at: datetime) -> str:
+    payload = {
+        "email": email,
+        "role": role,
+        "code": code,
+        "exp": int(expires_at.timestamp()),
+    }
+    return jwt.encode(payload, settings.AUTH_SECRET, algorithm="HS256")
+
 @router.post("/send-verification-code")
 async def send_verification_code(request: SendVerificationRequest):
     """
@@ -64,7 +78,7 @@ async def send_verification_code(request: SendVerificationRequest):
 
     # Generate verification code
     code = generate_verification_code()
-    expires_at = datetime.utcnow() + timedelta(minutes=10)  # Code valid for 10 minutes
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)  # Code valid for 10 minutes
 
     # Store verification code
     verification_codes[email] = {
@@ -72,6 +86,8 @@ async def send_verification_code(request: SendVerificationRequest):
         "role": role,
         "expires_at": expires_at
     }
+
+    verification_token = create_verification_token(email, role, code, expires_at)
     
     logger.info(f"Verification code generated for {email} (role: {role})")
 
@@ -86,7 +102,8 @@ async def send_verification_code(request: SendVerificationRequest):
     return {
         "message": "Verification code sent to email",
         "email": email,
-        "role": role
+        "role": role,
+        "verification_token": verification_token,
     }
 
 
@@ -102,41 +119,66 @@ def verify_code(request: VerifyCodeRequest) -> UserInfo:
     logger.info(f"Attempting to verify code for {email} (role: {role}), code: {code}")
     logger.debug(f"Current verification_codes keys: {list(verification_codes.keys())}")
 
-    # Check if verification code exists
-    if email not in verification_codes:
-        logger.warning(f"No verification code found for {email}. Available emails: {list(verification_codes.keys())}")
-        raise HTTPException(status_code=400, detail="No verification code sent to this email")
+    # Primary flow: stateless signed verification token
+    if request.verification_token:
+        try:
+            payload = jwt.decode(request.verification_token, settings.AUTH_SECRET, algorithms=["HS256"])
+            token_email = str(payload.get("email", "")).strip().lower()
+            token_role = str(payload.get("role", "")).strip().upper()
+            token_code = str(payload.get("code", "")).strip()
 
-    stored_data = verification_codes[email]
-    logger.debug(f"Stored data for {email}: code={stored_data['code']}, role={stored_data['role']}, expires_at={stored_data['expires_at']}")
+            if token_email != email:
+                raise HTTPException(status_code=400, detail="Verification token does not match email")
 
-    # Check if code has expired
-    current_time = datetime.utcnow()
-    if current_time > stored_data["expires_at"]:
-        time_diff = (current_time - stored_data["expires_at"]).total_seconds()
-        del verification_codes[email]
-        logger.warning(f"Verification code expired for {email} by {time_diff} seconds")
-        raise HTTPException(status_code=400, detail="Verification code has expired. Please request a new one.")
+            if token_role != role:
+                raise HTTPException(status_code=400, detail=f"Role mismatch: expected {token_role}, got {role}")
 
-    # Check if code matches
-    if code != stored_data["code"]:
-        logger.warning(f"Invalid code for {email}: got '{code}' (len={len(code)}), expected '{stored_data['code']}' (len={len(stored_data['code'])})")
-        raise HTTPException(status_code=400, detail="Invalid verification code")
+            if token_code != code:
+                raise HTTPException(status_code=400, detail="Invalid verification code")
 
-    # Check if role matches (case-insensitive)
-    stored_role = stored_data["role"].upper()
-    if role.upper() != stored_role:
-        logger.warning(f"Role mismatch for {email}: got {role}, expected {stored_role}")
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Role mismatch: expected {stored_role}, got {role}"
-        )
+        except JWTError:
+            raise HTTPException(status_code=400, detail="Verification session expired. Please request a new code.")
+    else:
+        # Backward-compatible fallback: in-memory verification store
+        if email not in verification_codes:
+            logger.warning(f"No verification code found for {email}. Available emails: {list(verification_codes.keys())}")
+            raise HTTPException(status_code=400, detail="No verification code sent to this email")
+
+        stored_data = verification_codes[email]
+        logger.debug(f"Stored data for {email}: code={stored_data['code']}, role={stored_data['role']}, expires_at={stored_data['expires_at']}")
+
+        # Check if code has expired
+        current_time = datetime.now(timezone.utc)
+        stored_expires_at = stored_data["expires_at"]
+        if stored_expires_at.tzinfo is None:
+            stored_expires_at = stored_expires_at.replace(tzinfo=timezone.utc)
+
+        if current_time > stored_expires_at:
+            time_diff = (current_time - stored_expires_at).total_seconds()
+            del verification_codes[email]
+            logger.warning(f"Verification code expired for {email} by {time_diff} seconds")
+            raise HTTPException(status_code=400, detail="Verification code has expired. Please request a new one.")
+
+        # Check if code matches
+        if code != stored_data["code"]:
+            logger.warning(f"Invalid code for {email}: got '{code}' (len={len(code)}), expected '{stored_data['code']}' (len={len(stored_data['code'])})")
+            raise HTTPException(status_code=400, detail="Invalid verification code")
+
+        # Check if role matches (case-insensitive)
+        stored_role = stored_data["role"].upper()
+        if role.upper() != stored_role:
+            logger.warning(f"Role mismatch for {email}: got {role}, expected {stored_role}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Role mismatch: expected {stored_role}, got {role}"
+            )
 
     # Code is valid, create token (simple token: email:role:timestamp)
     token = f"{email}:{role}:{datetime.utcnow().isoformat()}"
 
-    # Clean up used verification code
-    del verification_codes[email]
+    # Clean up used verification code if present in fallback in-memory store
+    if email in verification_codes:
+        del verification_codes[email]
     
     logger.info(f"Successfully verified {email} as {role}")
 

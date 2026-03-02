@@ -26,5 +26,6 @@ class Settings:
 
     FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://deviation-price.azurewebsites.net")
     BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL", "https://deviation-back.azurewebsites.net")
+    AUTH_SECRET = os.getenv("AUTH_SECRET", "local-dev-auth-secret-change-me")
 
 settings = Settings()
