@@ -23,20 +23,23 @@ COMMERCIAL_USERS = [
     {"name": "Austin YUAN", "email": "austin.yuan@avocarbon.com"},
     {"name": "Felix WANG", "email": "felix.wang@avocarbon.com"},
     {"name": "Rihem ARFAOUI", "email": "rihem.arfaoui@avocarbon.com"},
+    {"name": "Taha KHIARI", "email": "taha.khiari@avocarbon.com"},
+    {"name": "Olivier SPICKER", "email": "olivier.spicker@avocarbon.com"},
 ]
 
 PL_USERS = [
     {"name": "Cedric BOUVIER", "email": "cedric.bouvier@avocarbon.com"},
     {"name": "Allan RIEGEL", "email": "allan.riegel@avocarbon.com"},
     {"name": "Rihem ARFAOUI", "email": "rihem.arfaoui@avocarbon.com"},
-    {"name": "Ranine NOUIRA", "email": "ranine.nouira@avocarbon.com"},
+    {"name": "Taha KHIARI", "email": "taha.khiari@avocarbon.com"},
+    {"name": "Olivier SPICKER", "email": "olivier.spicker@avocarbon.com"},
 ]
 
 VP_USERS = [
     {"name": "Olivier SPICKER", "email": "olivier.spicker@avocarbon.com"},
     {"name": "Rihem ARFAOUI", "email": "rihem.arfaoui@avocarbon.com"},
     {"name": "Eric SUSZYLO", "email": "eric.suszylo@avocarbon.com"},
-    {"name": "Rami MEJRI", "email": "rami.mejri@avocarbon.com"},
+    {"name": "Taha KHIARI", "email": "taha.khiari@avocarbon.com"},
 ]
 
 def get_users_by_role(role: str):

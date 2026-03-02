@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
@@ -14,6 +14,7 @@ from app.models.pricing_request import PricingRequest
 from app.models.enums import RequestStatus
 from app.core.deps import get_db
 from app.emails.mailer import send_pricing_request_email
+from app.utils.notifications import create_request_submitted_notification
 import logging
 
 logger = logging.getLogger(__name__)
@@ -27,19 +28,24 @@ router = APIRouter(
 @router.post("/", response_model=dict)
 def submit_pricing_request(
     payload: PricingRequestCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     """
     Submit a new pricing request (Commercial role)
     """
+    requester_email = payload.requester_email.strip().lower()
+    pl_email = payload.product_line_responsible_email.strip().lower()
+    vp_email = payload.vp_email.strip().lower() if payload.vp_email else None
+
     # Validate avocarbon email
-    if not payload.requester_email.endswith("@avocarbon.com"):
+    if not requester_email.endswith("@avocarbon.com"):
         raise HTTPException(
             status_code=400,
             detail="Requester email must end with @avocarbon.com"
         )
     
-    if not payload.product_line_responsible_email.endswith("@avocarbon.com"):
+    if not pl_email.endswith("@avocarbon.com"):
         raise HTTPException(
             status_code=400,
             detail="Product line responsible email must end with @avocarbon.com"
@@ -75,11 +81,11 @@ def submit_pricing_request(
             target_price=payload.target_price,
             problem_to_solve=payload.problem_to_solve,
             attachment_path=payload.attachment_path,
-            requester_email=payload.requester_email,
+            requester_email=requester_email,
             requester_name=payload.requester_name,
-            product_line_responsible_email=payload.product_line_responsible_email,
+            product_line_responsible_email=pl_email,
             product_line_responsible_name=payload.product_line_responsible_name,
-            vp_email=payload.vp_email,
+            vp_email=vp_email,
             vp_name=payload.vp_name,
             status=RequestStatus.UNDER_REVIEW_PL.value
         )
@@ -88,21 +94,31 @@ def submit_pricing_request(
         db.commit()
         db.refresh(request)
 
-        # Send email to PL responsible
+        # Create in-app notification for PL inbox
         try:
-            send_pricing_request_email(
-                to_email=request.product_line_responsible_email,
-                project_name=request.project_name,
-                customer=request.customer,
-                initial_price=float(request.initial_price),
-                target_price=float(request.target_price),
+            create_request_submitted_notification(
+                db=db,
                 request_id=request.id,
+                recipient_email=request.product_line_responsible_email,
+                recipient_role="PL",
+                requester_name=request.requester_name,
+                requester_email=request.requester_email,
                 costing_number=request.costing_number,
             )
-        except Exception as e:
-            logger.error(f"Failed to send email for request {request.id}: {str(e)}")
-            # Don't fail the request if email fails
-            pass
+        except Exception as notification_error:
+            logger.warning(f"In-app notification failed for request {request.id}: {notification_error}")
+
+        # Send email to PL responsible immediately after submit (async background task)
+        background_tasks.add_task(
+            send_pricing_request_email,
+            to_email=request.product_line_responsible_email,
+            project_name=request.project_name,
+            customer=request.customer,
+            initial_price=float(request.initial_price),
+            target_price=float(request.target_price),
+            request_id=request.id,
+            costing_number=request.costing_number,
+        )
 
         return {
             "message": "Pricing request submitted successfully",

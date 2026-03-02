@@ -58,18 +58,21 @@ def create_comment(
     request = db.query(PricingRequest).filter(PricingRequest.id == request_id).first()
     if not request:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
+
+    normalized_author_email = author_email.strip().lower()
+    normalized_author_name = (author_name or "").strip() or normalized_author_email.split("@")[0]
     
     # Determine role based on email
     role = "COMMERCIAL"  # default
-    if author_email == request.product_line_responsible_email:
+    if normalized_author_email == (request.product_line_responsible_email or "").strip().lower():
         role = "PL"
-    elif author_email == request.vp_email:
+    elif normalized_author_email == (request.vp_email or "").strip().lower():
         role = "VP"
     
     new_comment = Comment(
         request_id=request_id,
-        author_email=author_email,
-        author_name=author_name,
+        author_email=normalized_author_email,
+        author_name=normalized_author_name,
         author_role=role,
         content=comment.content
     )
@@ -78,69 +81,45 @@ def create_comment(
     db.commit()
     db.refresh(new_comment)
 
-    # Create notifications for relevant parties
-    # Notify PL if commercial commented
-    if role == "COMMERCIAL" and request.product_line_responsible_email:
+    # Create notifications for relevant parties (deduplicated)
+    from app.models.enums import RequestStatus
+
+    recipients: dict[str, str] = {}
+
+    pl_email = (request.product_line_responsible_email or "").strip().lower()
+    vp_email = (request.vp_email or "").strip().lower()
+    commercial_email = (request.requester_email or "").strip().lower()
+    vp_visible_statuses = {
+        RequestStatus.ESCALATED_TO_VP.value,
+        RequestStatus.APPROVED_BY_VP.value,
+        RequestStatus.REJECTED_BY_VP.value,
+    }
+
+    if role == "COMMERCIAL":
+        if pl_email:
+            recipients[pl_email] = "PL"
+        if vp_email and request.status in vp_visible_statuses:
+            recipients[vp_email] = "VP"
+    elif role == "PL":
+        if commercial_email:
+            recipients[commercial_email] = "COMMERCIAL"
+        if vp_email and request.status in vp_visible_statuses:
+            recipients[vp_email] = "VP"
+    elif role == "VP":
+        if commercial_email:
+            recipients[commercial_email] = "COMMERCIAL"
+        if pl_email:
+            recipients[pl_email] = "PL"
+
+    for recipient_email, recipient_role in recipients.items():
         create_comment_notification(
             db=db,
-            recipient_email=request.product_line_responsible_email,
-            recipient_role="PL",
+            recipient_email=recipient_email,
+            recipient_role=recipient_role,
             request_id=request_id,
-            commenter_name=author_name,
-            commenter_email=author_email,
-            comment_preview=comment.content[:100],
-        )
-    
-    # Notify VP if commercial commented and request is escalated
-    if role == "COMMERCIAL" and request.vp_email and request.vp_email != request.product_line_responsible_email:
-        from app.models.enums import RequestStatus
-        if request.status in [RequestStatus.ESCALATED_TO_VP.value, RequestStatus.APPROVED_BY_VP.value, RequestStatus.REJECTED_BY_VP.value]:
-            create_comment_notification(
-                db=db,
-                recipient_email=request.vp_email,
-                recipient_role="VP",
-                request_id=request_id,
-                commenter_name=author_name,
-                commenter_email=author_email,
-                comment_preview=comment.content[:100],
-            )
-    
-    # Notify commercial if PL or VP commented
-    if role in ["PL", "VP"] and request.requester_email:
-        create_comment_notification(
-            db=db,
-            recipient_email=request.requester_email,
-            recipient_role="COMMERCIAL",
-            request_id=request_id,
-            commenter_name=author_name,
-            commenter_email=author_email,
-            comment_preview=comment.content[:100],
-        )
-    
-    # Notify VP if PL commented and request is escalated or approved
-    if role == "PL" and request.vp_email and request.vp_email != request.product_line_responsible_email:
-        from app.models.enums import RequestStatus
-        if request.status in [RequestStatus.ESCALATED_TO_VP.value, RequestStatus.APPROVED_BY_VP.value, RequestStatus.REJECTED_BY_VP.value]:
-            create_comment_notification(
-                db=db,
-                recipient_email=request.vp_email,
-                recipient_role="VP",
-                request_id=request_id,
-                commenter_name=author_name,
-                commenter_email=author_email,
-                comment_preview=comment.content[:100],
-            )
-    
-    # Notify PL if VP commented (so they can see the discussion)
-    if role == "VP" and request.product_line_responsible_email and request.product_line_responsible_email != request.vp_email:
-        create_comment_notification(
-            db=db,
-            recipient_email=request.product_line_responsible_email,
-            recipient_role="PL",
-            request_id=request_id,
-            commenter_name=author_name,
-            commenter_email=author_email,
-            comment_preview=comment.content[:100],
+            commenter_name=normalized_author_name,
+            commenter_email=normalized_author_email,
+            comment_preview=comment.content,
         )
     
     return new_comment

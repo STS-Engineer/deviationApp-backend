@@ -2,9 +2,13 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load .env from the app directory
-env_path = Path(__file__).resolve().parent.parent / ".env"
-load_dotenv(dotenv_path=env_path)
+# Load .env from backend root first, then app folder as fallback
+config_path = Path(__file__).resolve()
+backend_env_path = config_path.parents[2] / ".env"
+app_env_path = config_path.parents[1] / ".env"
+
+load_dotenv(dotenv_path=backend_env_path)
+load_dotenv(dotenv_path=app_env_path)
 
 class Settings:
     DB_HOST = os.getenv("DB_HOST")

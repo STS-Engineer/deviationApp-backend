@@ -54,8 +54,8 @@ async def send_verification_code(request: SendVerificationRequest):
     """
     Send verification code to email address.
     """
-    email = request.email.lower()
-    role = request.role.upper()
+    email = str(request.email).strip().lower()
+    role = request.role.strip().upper()
 
     # Validate role
     valid_roles = ["COMMERCIAL", "PL", "VP"]
@@ -95,9 +95,9 @@ def verify_code(request: VerifyCodeRequest) -> UserInfo:
     """
     Verify the code sent to email and return user info with token.
     """
-    email = request.email.lower()
+    email = str(request.email).strip().lower()
     code = request.code.strip()
-    role = request.role.upper()
+    role = request.role.strip().upper()
     
     logger.info(f"Attempting to verify code for {email} (role: {role}), code: {code}")
     logger.debug(f"Current verification_codes keys: {list(verification_codes.keys())}")
